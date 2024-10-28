@@ -21,6 +21,7 @@ from labelbox import (
 )
 from labelbox.schema.data_row import DataRowMetadataField
 from labelbox.schema.ontology_kind import OntologyKind
+from labelbox.schema.tool_building.step_reasoning_tool import StepReasoningTool
 from labelbox.schema.user import User
 
 
@@ -562,6 +563,7 @@ def feature_schema(client, point):
 @pytest.fixture
 def chat_evaluation_ontology(client, rand_gen):
     ontology_name = f"test-chat-evaluation-ontology-{rand_gen(str)}"
+
     ontology_builder = OntologyBuilder(
         tools=[
             Tool(
@@ -576,6 +578,7 @@ def chat_evaluation_ontology(client, rand_gen):
                 tool=Tool.Type.MESSAGE_RANKING,
                 name="model output multi ranking",
             ),
+            StepReasoningTool(name="step reasoning"),
         ],
         classifications=[
             Classification(
@@ -626,14 +629,12 @@ def chat_evaluation_ontology(client, rand_gen):
             ),
         ],
     )
-
     ontology = client.create_ontology(
         ontology_name,
         ontology_builder.asdict(),
         media_type=MediaType.Conversational,
         ontology_kind=OntologyKind.ModelEvaluation,
     )
-
     yield ontology
 
     try:
