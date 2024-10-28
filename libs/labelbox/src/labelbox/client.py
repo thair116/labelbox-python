@@ -151,6 +151,12 @@ class Client:
     def app_url(self) -> str:
         return self._request_client.app_url
 
+    def set_sdk_method(self, sdk_method: str):
+        self._request_client.sdk_method = sdk_method
+
+    def unset_sdk_method(self):
+        self._request_client.sdk_method = None
+
     def execute(
         self,
         query=None,
