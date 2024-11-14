@@ -1,19 +1,16 @@
+import time
 import uuid
-from typing import Union
+from typing import Tuple, Type, Union
 
+import pytest
+import requests
+from pytest import FixtureRequest
+
+from labelbox import Client, Dataset, MediaType, OntologyKind, parser
+from labelbox.schema.annotation_import import AnnotationImportState, LabelImport
 from labelbox.schema.model_run import ModelRun
 from labelbox.schema.ontology import Ontology
 from labelbox.schema.project import Project
-import pytest
-import time
-import requests
-
-from labelbox import parser, MediaType, OntologyKind
-from labelbox import Client, Dataset
-
-from typing import Tuple, Type
-from labelbox.schema.annotation_import import LabelImport, AnnotationImportState
-from pytest import FixtureRequest
 
 """
 The main fixtures of this library are configured_project and configured_project_by_global_key. Both fixtures generate data rows with a parametrize media type. They create the amount of data rows equal to the DATA_ROW_COUNT variable below. The data rows are generated with a factory fixture that returns a function that allows you to pass a global key. The ontologies are generated normalized and based on the MediaType given (i.e. only features supported by MediaType are created). This ontology is later used to obtain the correct annotations with the prediction_id_mapping and corresponding inferences. Each data row will have all possible annotations attached supported for the MediaType. 
@@ -57,18 +54,6 @@ def conversational_data_row_factory():
         }
 
     return conversational_data_row
-
-
-@pytest.fixture(scope="module", autouse=True)
-def dicom_data_row_factory():
-    def dicom_data_row(global_key):
-        return {
-            "row_data": "https://storage.googleapis.com/labelbox-datasets/dicom-sample-data/sample-dicom-1.dcm",
-            "global_key": f"https://storage.googleapis.com/labelbox-datasets/dicom-sample-data/sample-dicom-1.dcm-{global_key}",
-            "media_type": "DICOM",
-        }
-
-    return dicom_data_row
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -173,7 +158,6 @@ def offline_model_evaluation_data_row_factory(mmc_data_row_url: str):
 def data_row_json_by_media_type(
     audio_data_row_factory,
     conversational_data_row_factory,
-    dicom_data_row_factory,
     geospatial_data_row_factory,
     html_data_row_factory,
     image_data_row_factory,
@@ -185,7 +169,6 @@ def data_row_json_by_media_type(
     return {
         MediaType.Audio: audio_data_row_factory,
         MediaType.Conversational: conversational_data_row_factory,
-        MediaType.Dicom: dicom_data_row_factory,
         MediaType.Geospatial_Tile: geospatial_data_row_factory,
         MediaType.Html: html_data_row_factory,
         MediaType.Image: image_data_row_factory,
@@ -540,10 +523,6 @@ def normalized_ontology_by_media_type():
                 free_form_text,
                 radio,
             ],
-        },
-        MediaType.Dicom: {
-            "tools": [raster_segmentation_tool, polyline_tool],
-            "classifications": [],
         },
         MediaType.Conversational: {
             "tools": [entity_tool],
@@ -1257,35 +1236,6 @@ def line_inference(prediction_id_mapping):
 
 
 @pytest.fixture
-def line_inference_v2(prediction_id_mapping):
-    lines = []
-    for feature in prediction_id_mapping:
-        if "line" not in feature:
-            continue
-        line = feature["line"].copy()
-        line_data = {
-            "groupKey": "axial",
-            "segments": [
-                {
-                    "keyframes": [
-                        {
-                            "frame": 1,
-                            "line": [
-                                {"x": 147.692, "y": 118.154},
-                                {"x": 150.692, "y": 160.154},
-                            ],
-                        }
-                    ]
-                },
-            ],
-        }
-        line.update(line_data)
-        del line["tool"]
-        lines.append(line)
-    return lines
-
-
-@pytest.fixture
 def point_inference(prediction_id_mapping):
     points = []
     for feature in prediction_id_mapping:
@@ -1796,7 +1746,6 @@ def annotations_by_media_type(
     polygon_inference,
     rectangle_inference,
     rectangle_inference_document,
-    line_inference_v2,
     line_inference,
     entity_inference,
     entity_inference_index,
@@ -1825,7 +1774,6 @@ def annotations_by_media_type(
             text_inference_index,
             entity_inference_index,
         ],
-        MediaType.Dicom: [line_inference_v2],
         MediaType.Document: [
             entity_inference_document,
             checklist_inference,
@@ -2314,51 +2262,6 @@ def expected_export_v2_conversation():
 
 
 @pytest.fixture()
-def expected_export_v2_dicom():
-    expected_annotations = {
-        "groups": {
-            "Axial": {
-                "name": "Axial",
-                "classifications": [],
-                "frames": {
-                    "1": {
-                        "objects": {
-                            "<cuid>": {
-                                "name": "polyline",
-                                "value": "polyline",
-                                "annotation_kind": "DICOMPolyline",
-                                "classifications": [],
-                                "line": [
-                                    {"x": 147.692, "y": 118.154},
-                                    {"x": 150.692, "y": 160.154},
-                                ],
-                            }
-                        },
-                        "classifications": [],
-                    }
-                },
-            },
-            "Sagittal": {
-                "name": "Sagittal",
-                "classifications": [],
-                "frames": {},
-            },
-            "Coronal": {"name": "Coronal", "classifications": [], "frames": {}},
-        },
-        "segments": {
-            "Axial": {"<cuid>": [[1, 1]]},
-            "Sagittal": {},
-            "Coronal": {},
-        },
-        "classifications": [],
-        "key_frame_feature_map": {
-            "<cuid>": {"Axial": {"1": True}, "Coronal": {}, "Sagittal": {}}
-        },
-    }
-    return expected_annotations
-
-
-@pytest.fixture()
 def expected_export_v2_document():
     expected_annotations = {
         "objects": [
@@ -2665,7 +2568,6 @@ def exports_v2_by_media_type(
     expected_export_v2_text,
     expected_export_v2_video,
     expected_export_v2_conversation,
-    expected_export_v2_dicom,
     expected_export_v2_document,
     expected_export_v2_llm_prompt_response_creation,
     expected_export_v2_llm_prompt_creation,
@@ -2679,7 +2581,6 @@ def exports_v2_by_media_type(
         MediaType.Text: expected_export_v2_text,
         MediaType.Video: expected_export_v2_video,
         MediaType.Conversational: expected_export_v2_conversation,
-        MediaType.Dicom: expected_export_v2_dicom,
         MediaType.Document: expected_export_v2_document,
         MediaType.LLMPromptResponseCreation: expected_export_v2_llm_prompt_response_creation,
         MediaType.LLMPromptCreation: expected_export_v2_llm_prompt_creation,

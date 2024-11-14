@@ -15,12 +15,9 @@ from .relationship import Relationship
 
 from .video import VideoClassificationAnnotation
 from .video import VideoObjectAnnotation
-from .video import DICOMObjectAnnotation
-from .video import GroupKey
 from .video import MaskFrame
 from .video import MaskInstance
 from .video import VideoMaskAnnotation
-from .video import DICOMMaskAnnotation
 
 from .ner import ConversationEntity
 from .ner import DocumentEntity

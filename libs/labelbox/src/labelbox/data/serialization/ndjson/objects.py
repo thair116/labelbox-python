@@ -1,58 +1,55 @@
-from io import BytesIO
-from typing import Any, Dict, List, Tuple, Union, Optional
 import base64
+from io import BytesIO
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
+from PIL import Image
+from pydantic import BaseModel
+
+from labelbox.data.annotation_types.data import GenericDataRowData
 from labelbox.data.annotation_types.data.raster import MaskData
 from labelbox.data.annotation_types.ner.conversation_entity import (
     ConversationEntity,
 )
 from labelbox.data.annotation_types.video import (
     VideoObjectAnnotation,
-    DICOMObjectAnnotation,
 )
 from labelbox.data.mixins import (
     ConfidenceMixin,
-    CustomMetricsMixin,
     CustomMetric,
+    CustomMetricsMixin,
     CustomMetricsNotSupportedMixin,
 )
+
 from ....annotated_types import Cuid
-import numpy as np
-
-from PIL import Image
-
-from labelbox.data.annotation_types.data import GenericDataRowData
-
+from ...annotation_types.annotation import (
+    ClassificationAnnotation,
+    ObjectAnnotation,
+)
 from ...annotation_types.data import GenericDataRowData
+from ...annotation_types.geometry import (
+    DocumentRectangle,
+    Line,
+    Mask,
+    Point,
+    Polygon,
+    Rectangle,
+)
 from ...annotation_types.ner import (
     DocumentEntity,
     DocumentTextSelection,
     TextEntity,
 )
-from ...annotation_types.geometry import (
-    DocumentRectangle,
-    Rectangle,
-    Polygon,
-    Line,
-    Point,
-    Mask,
-)
-from ...annotation_types.annotation import (
-    ClassificationAnnotation,
-    ObjectAnnotation,
-)
 from ...annotation_types.video import (
-    VideoMaskAnnotation,
-    DICOMMaskAnnotation,
     MaskFrame,
     MaskInstance,
+    VideoMaskAnnotation,
 )
+from .base import DataRow, NDAnnotation, NDJsonBase
 from .classification import (
     NDSubclassification,
     NDSubclassificationType,
 )
-from .base import DataRow, NDAnnotation, NDJsonBase
-from pydantic import BaseModel
 
 
 class NDBaseObject(NDAnnotation):
@@ -62,10 +59,6 @@ class NDBaseObject(NDAnnotation):
 class VideoSupported(BaseModel):
     # support for video for objects are per-frame basis
     frame: int
-
-
-class DicomSupported(BaseModel):
-    group_key: str
 
 
 class _Point(BaseModel):
@@ -207,25 +200,6 @@ class NDFrameLine(VideoSupported):
             frame=frame,
             line=[{"x": pt.x, "y": pt.y} for pt in line.points],
             classifications=classifications,
-        )
-
-
-class NDDicomLine(NDFrameLine):
-    def to_common(
-        self,
-        name: str,
-        feature_schema_id: Cuid,
-        segment_index: int,
-        group_key: str,
-    ) -> DICOMObjectAnnotation:
-        return DICOMObjectAnnotation(
-            frame=self.frame,
-            segment_index=segment_index,
-            keyframe=True,
-            name=name,
-            feature_schema_id=feature_schema_id,
-            value=Line(points=[Point(x=pt.x, y=pt.y) for pt in self.line]),
-            group_key=group_key,
         )
 
 
@@ -452,116 +426,6 @@ class NDSegment(BaseModel):
         )
 
 
-class NDDicomSegment(NDSegment):
-    keyframes: List[NDDicomLine]
-
-    @staticmethod
-    def lookup_segment_object_type(segment: List) -> "NDDicomObjectType":
-        """Used for determining which object type the annotation contains
-        returns the object type"""
-        segment_class = type(segment[0].value)
-        if segment_class == Line:
-            return NDDicomLine
-        else:
-            raise ValueError("DICOM segments only support Line objects")
-
-    def to_common(
-        self,
-        name: str,
-        feature_schema_id: Cuid,
-        uuid: str,
-        segment_index: int,
-        group_key: str,
-    ):
-        return [
-            self.segment_with_uuid(
-                keyframe.to_common(
-                    name=name,
-                    feature_schema_id=feature_schema_id,
-                    segment_index=segment_index,
-                    group_key=group_key,
-                ),
-                uuid,
-            )
-            for keyframe in self.keyframes
-        ]
-
-
-class NDSegments(NDBaseObject):
-    segments: List[NDSegment]
-
-    def to_common(self, name: str, feature_schema_id: Cuid):
-        result = []
-        for idx, segment in enumerate(self.segments):
-            result.extend(
-                segment.to_common(
-                    name=name,
-                    feature_schema_id=feature_schema_id,
-                    segment_index=idx,
-                    uuid=self.uuid,
-                )
-            )
-        return result
-
-    @classmethod
-    def from_common(
-        cls,
-        segments: List[VideoObjectAnnotation],
-        data: GenericDataRowData,
-        name: str,
-        feature_schema_id: Cuid,
-        extra: Dict[str, Any],
-    ) -> "NDSegments":
-        segments = [NDSegment.from_common(segment) for segment in segments]
-
-        return cls(
-            segments=segments,
-            data_row=DataRow(id=data.uid, global_key=data.global_key),
-            name=name,
-            schema_id=feature_schema_id,
-            uuid=extra.get("uuid"),
-        )
-
-
-class NDDicomSegments(NDBaseObject, DicomSupported):
-    segments: List[NDDicomSegment]
-
-    def to_common(self, name: str, feature_schema_id: Cuid):
-        result = []
-        for idx, segment in enumerate(self.segments):
-            result.extend(
-                segment.to_common(
-                    name=name,
-                    feature_schema_id=feature_schema_id,
-                    segment_index=idx,
-                    uuid=self.uuid,
-                    group_key=self.group_key,
-                )
-            )
-        return result
-
-    @classmethod
-    def from_common(
-        cls,
-        segments: List[DICOMObjectAnnotation],
-        data: GenericDataRowData,
-        name: str,
-        feature_schema_id: Cuid,
-        extra: Dict[str, Any],
-        group_key: str,
-    ) -> "NDDicomSegments":
-        segments = [NDDicomSegment.from_common(segment) for segment in segments]
-
-        return cls(
-            segments=segments,
-            dataRow=DataRow(id=data.uid, global_key=data.global_key),
-            name=name,
-            schema_id=feature_schema_id,
-            uuid=extra.get("uuid"),
-            group_key=group_key,
-        )
-
-
 class _URIMask(BaseModel):
     instanceURI: str
     colorRGB: Tuple[int, int, int]
@@ -663,25 +527,6 @@ class NDVideoMasks(
             masks=NDVideoMasksFramesInstances(
                 frames=annotation.frames, instances=annotation.instances
             ),
-        )
-
-
-class NDDicomMasks(NDVideoMasks, DicomSupported):
-    def to_common(self) -> DICOMMaskAnnotation:
-        return DICOMMaskAnnotation(
-            frames=self.masks.frames,
-            instances=self.masks.instances,
-            group_key=self.group_key,
-        )
-
-    @classmethod
-    def from_common(cls, annotation, data):
-        return cls(
-            data_row=DataRow(id=data.uid, global_key=data.global_key),
-            masks=NDVideoMasksFramesInstances(
-                frames=annotation.frames, instances=annotation.instances
-            ),
-            group_key=annotation.group_key.value,
         )
 
 
@@ -848,22 +693,7 @@ class NDObject:
         obj = cls.lookup_object(annotation)
 
         # if it is video segments
-        if obj == NDSegments or obj == NDDicomSegments:
-            first_video_annotation = annotation[0][0]
-            args = dict(
-                segments=annotation,
-                data=data,
-                name=first_video_annotation.name,
-                feature_schema_id=first_video_annotation.feature_schema_id,
-                extra=first_video_annotation.extra,
-            )
-
-            if isinstance(first_video_annotation, DICOMObjectAnnotation):
-                group_key = first_video_annotation.group_key.value
-                args.update(dict(group_key=group_key))
-
-            return obj.from_common(**args)
-        elif obj == NDVideoMasks or obj == NDDicomMasks:
+        if obj == NDVideoMasks:
             return obj.from_common(annotation, data)
 
         subclasses = [
@@ -892,20 +722,10 @@ class NDObject:
     def lookup_object(
         annotation: Union[ObjectAnnotation, List],
     ) -> "NDObjectType":
-        if isinstance(annotation, DICOMMaskAnnotation):
-            result = NDDicomMasks
-        elif isinstance(annotation, VideoMaskAnnotation):
+        if isinstance(annotation, VideoMaskAnnotation):
             result = NDVideoMasks
         elif isinstance(annotation, list):
-            try:
-                first_annotation = annotation[0][0]
-            except IndexError:
-                raise ValueError("Annotation list cannot be empty")
-
-            if isinstance(first_annotation, DICOMObjectAnnotation):
-                result = NDDicomSegments
-            else:
-                result = NDSegments
+            result = NDSegments
         else:
             result = {
                 Line: NDLine,
@@ -938,4 +758,3 @@ NDObjectType = Union[
 ]
 
 NDFrameObjectType = NDFrameRectangle, NDFramePoint, NDFrameLine
-NDDicomObjectType = NDDicomLine
