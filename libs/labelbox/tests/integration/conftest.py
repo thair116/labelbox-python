@@ -16,6 +16,7 @@ from labelbox import (
     MediaType,
     OntologyBuilder,
     Option,
+    PromptIssueTool,
     PromptResponseClassification,
     ResponseOption,
     StepReasoningTool,
@@ -581,6 +582,7 @@ def chat_evaluation_ontology(client, rand_gen):
             ),
             StepReasoningTool(name="step reasoning"),
             FactCheckingTool(name="fact checking"),
+            PromptIssueTool(name="prompt issue"),
         ],
         classifications=[
             Classification(

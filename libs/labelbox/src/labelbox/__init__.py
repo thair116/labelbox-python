@@ -46,17 +46,14 @@ from labelbox.schema.model import Model
 from labelbox.schema.model_config import ModelConfig
 from labelbox.schema.model_run import DataSplit, ModelRun
 from labelbox.schema.ontology import (
-    Classification,
     FeatureSchema,
     Ontology,
     OntologyBuilder,
-    Option,
-    PromptResponseClassification,
-    ResponseOption,
     Tool,
 )
 from labelbox.schema.tool_building.fact_checking_tool import FactCheckingTool
 from labelbox.schema.tool_building.step_reasoning_tool import StepReasoningTool
+from labelbox.schema.tool_building.prompt_issue_tool import PromptIssueTool
 from labelbox.schema.role import Role, ProjectRole
 from labelbox.schema.invite import Invite, InviteLimit
 from labelbox.schema.data_row_metadata import (
@@ -94,3 +91,9 @@ from labelbox.schema.task import Task
 from labelbox.schema.task_queue import TaskQueue
 from labelbox.schema.user import User
 from labelbox.schema.webhook import Webhook
+from labelbox.schema.tool_building.classification import (
+    Classification,
+    Option,
+    ResponseOption,
+    PromptResponseClassification,
+)

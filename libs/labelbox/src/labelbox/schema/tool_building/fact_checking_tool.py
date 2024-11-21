@@ -65,6 +65,8 @@ def build_fact_checking_definition():
 class FactCheckingTool(_BaseStepReasoningTool):
     """
     Use this class in OntologyBuilder to create a tool for fact checking
+
+    Note variant kinds can not be changed
     """
 
     type: ToolType = field(default=ToolType.FACT_CHECKING, init=False)
