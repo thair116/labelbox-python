@@ -1334,6 +1334,7 @@ class Client:
         normalized,
         media_type: MediaType = None,
         ontology_kind: OntologyKind = None,
+        ontology_id: str = None,
     ) -> Ontology:
         """
         Creates an ontology from normalized data
@@ -1354,6 +1355,7 @@ class Client:
             media_type (MediaType or None): Media type of a new ontology
             ontology_kind (OntologyKind or None): set to OntologyKind.ModelEvaluation if the ontology is for chat evaluation or
                 OntologyKind.ResponseCreation if ontology is for response creation, leave as None otherwise.
+            ontology_id (str): The id of the ontology to update
 
         Returns:
             The created Ontology
@@ -1390,6 +1392,8 @@ class Client:
                 "mediaType": media_type_value,
             }
         }
+        if ontology_id is not None:
+            params["data"]["id"] = ontology_id
         if editor_task_type_value:
             params["data"]["editorTaskType"] = editor_task_type_value
 
